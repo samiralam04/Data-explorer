@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Navigation {
+  id              String     @id @default(uuid())
+  title           String
+  slug            String     @unique
+  last_scraped_at DateTime?
+  categories      Category[]
+
+  @@map("navigation")
+}
+
+model Category {
+  id              String     @id @default(uuid())
+  navigation_id   String
+  parent_id       String?
+  title           String
+  slug            String     @unique
+  source_url      String?    // The actual URL found during navigation scraping
+  product_count   Int        @default(0)
+  last_scraped_at DateTime?
+  
+  navigation      Navigation @relation(fields: [navigation_id], references: [id])
+  parent          Category?  @relation("CategoryToCategory", fields: [parent_id], references: [id])
+  children        Category[] @relation("CategoryToCategory")
+  // Note: Depending on requirements, product relation might be scraping-time only or persisted. 
+  // We don't necessarily need a hard relation if we just store source_id, but it's good practice.
+  // For now, I won't link Product safely to avoid massive relation overhead if not needed, 
+  // but usually Products belong to Categories.
+  // Let's add a relation for structure.
+  products        Product[]
+
+  @@map("category")
+}
+
+model Product {
+  id              String         @id @default(uuid())
+  source_id       String         @unique // Extracted ID from source
+  title           String
+  author          String?
+  price           Decimal        @db.Decimal(10, 2)
+  currency        String         @default("GBP")
+  image_url       String?
+  source_url      String         @unique
+  last_scraped_at DateTime?
+  
+  category_id     String?
+  category        Category?      @relation(fields: [category_id], references: [id])
+
+  product_detail  ProductDetail?
+  reviews         Review[]
+  
+  @@index([slug])
+  // Slug might be derived from source_url or title, useful for frontend routing
+  slug            String         @unique
+
+  @@map("product")
+}
+
+model ProductDetail {
+  product_id    String  @id
+  description   String? @db.Text
+  specs         Json?   // Storing generic specs
+  ratings_avg   Float   @default(0)
+  reviews_count Int     @default(0)
+
+  product       Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("product_detail")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  product_id String
+  author     String
+  rating     Float
+  text       String?  @db.Text
+  created_at DateTime @default(now())
+
+  product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("review")
+}
+
+model ScrapeJob {
+  id          String    @id @default(uuid())
+  target_url  String
+  target_type String    // 'NAVIGATION', 'CATEGORY', 'PRODUCT'
+  status      String    // 'PENDING', 'RUNNING', 'DONE', 'FAILED'
+  started_at  DateTime?
+  finished_at DateTime?
+  error_log   String?   @db.Text
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  @@map("scrape_job")
+}
+
+model ViewHistory {
+  id         String   @id @default(uuid())
+  session_id String
+  path_json  Json     // Storing the breadcrumb or path payload
+  created_at DateTime @default(now())
+
+  @@map("view_history")
+}

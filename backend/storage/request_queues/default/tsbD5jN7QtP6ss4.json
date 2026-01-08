@@ -1,0 +1,9 @@
+{
+	"id": "tsbD5jN7QtP6ss4",
+	"json": "{\"id\":\"tsbD5jN7QtP6ss4\",\"url\":\"https://www.worldofbooks.com/en-gb/collections/author-books-by-alice-oseman\",\"loadedUrl\":\"https://www.worldofbooks.com/en-gb/collections/author-books-by-alice-oseman\",\"uniqueKey\":\"https://www.worldofbooks.com/en-gb/collections/author-books-by-alice-oseman\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2026-01-08T11:27:06.702Z\"}",
+	"method": "GET",
+	"orderNo": null,
+	"retryCount": 0,
+	"uniqueKey": "https://www.worldofbooks.com/en-gb/collections/author-books-by-alice-oseman",
+	"url": "https://www.worldofbooks.com/en-gb/collections/author-books-by-alice-oseman"
+}
