@@ -49,52 +49,62 @@ export class ScrapeService implements OnModuleInit {
             },
         });
 
-        // Trigger processing asynchronously
-        this.processJob(job.id).catch(err => this.logger.error(err));
+
 
         return job;
     }
 
-    /**
-     * Main processor for scrape jobs.
-     * Can be triggered via Cron or API.
-     * For simplicity, let's just run it on demand or loop one by one.
-     */
+    async getJobStatus(id: string) {
+        return this.prisma.scrapeJob.findUnique({ where: { id } });
+    }
+
+
     async processJob(jobId: string) {
         const job = await this.prisma.scrapeJob.findUnique({ where: { id: jobId } });
         if (!job) return;
+
+        // ETHICAL CHECK: Verify TTL
+        if (await this.isFresh(job.target_url, job.target_type)) {
+            this.logger.log(`Skipping scrape for ${job.target_url} (Data is fresh)`);
+            await this.prisma.scrapeJob.update({
+                where: { id: jobId },
+                data: { status: 'SKIPPED', finished_at: new Date(), error_log: 'Skipped: TTL fresh' }
+            });
+            return;
+        }
 
         await this.prisma.scrapeJob.update({
             where: { id: jobId },
             data: { status: 'RUNNING', started_at: new Date() },
         });
 
+        this.crawler = new PlaywrightCrawler({
+            requestHandler: async ({ page, request, log }) => {
+                log.info(`Processing ${request.url} ...`);
+
+                // ETHICAL DELAY
+                await new Promise(r => setTimeout(r, 2000));
+
+                if (job.target_type === 'NAVIGATION') {
+                    await this.handleNavigation(page);
+                } else if (job.target_type === 'CATEGORY') {
+                    await this.handleCategory(page, job.target_url);
+                } else if (job.target_type === 'PRODUCT') {
+                    await this.handleProduct(page, job.target_url);
+                }
+            },
+            maxConcurrency: 2, // Ethical limit
+            requestHandlerTimeoutSecs: 60,
+        });
+
         try {
-            this.logger.log(`Starting scrape job ${jobId} for ${job.target_url}`);
-
-            this.crawler = new PlaywrightCrawler({
-                // headless: true, // Default
-                requestHandler: async ({ page, request, log }) => {
-                    log.info(`Processing ${request.url} ...`);
-
-                    if (job.target_type === 'NAVIGATION') {
-                        await this.handleNavigation(page);
-                    } else if (job.target_type === 'CATEGORY') {
-                        await this.handleCategory(page, job.target_url);
-                    } else if (job.target_type === 'PRODUCT') {
-                        await this.handleProduct(page, job.target_url);
-                    }
-                },
-                maxRequestsPerCrawl: 50, // Safety limit
-            });
-
             await this.crawler.run([job.target_url]);
-
             await this.prisma.scrapeJob.update({
                 where: { id: jobId },
                 data: { status: 'DONE', finished_at: new Date() },
             });
-            this.logger.log(`Job ${jobId} completed.`);
+            // Update last_scraped_at on the entity itself
+            await this.updateEntityTimestamp(job.target_url, job.target_type);
         } catch (e) {
             this.logger.error(`Job ${jobId} failed: ${e.message}`);
             await this.prisma.scrapeJob.update({
@@ -132,17 +142,7 @@ export class ScrapeService implements OnModuleInit {
                 create: { title, slug, last_scraped_at: new Date() },
             });
 
-            // Also upsert a corresponding root Category for this navigation item
-            // This allows it to be browsed as a category (product list)
-            // Use the link as source_url (handling relative paths if needed later, but scraping usually gives relative or absolute)
-            // Playwright's href is usually absolute if we access .href property, but let's assume relative from text content extraction might need care.
-            // In handleNavigation we used `el => el.getAttribute('href')` so it returns relative path usually.
-            // We'll store it as is, frontend will prepend domain if needed, or we can prepend here.
-            // The browser subagent saw `https://www.worldofbooks.com/en-gb/collections/fiction-books`
 
-            // Let's ensure we save the link as source_url
-            // If it starts with /, we can prepend domain during scrape or use as is. 
-            // Let's store as is for now, consistent with how we got it.
             const source_url = item.link;
 
             await this.prisma.category.upsert({
@@ -176,11 +176,7 @@ export class ScrapeService implements OnModuleInit {
         }
 
         const categorySlug = url.split('/').pop();
-        // Resolve navigation ID if possible, or parent category.
-        // For simplicity, we just link to existing category if slug matches, or create loose one.
-        // Ideally we'd look up the navigation item first.
 
-        // Find or create category
         let category = await this.prisma.category.findUnique({ where: { slug: categorySlug } });
         if (!category) {
             // Try to link to a default nav if unknown
@@ -314,5 +310,39 @@ export class ScrapeService implements OnModuleInit {
                 ratings_avg: 0
             }
         });
+    }
+
+    private async isFresh(url: string, type: string): Promise<boolean> {
+        let lastScraped: Date | null | undefined;
+
+        if (type === 'NAVIGATION') {
+            const nav = await this.prisma.navigation.findFirst();
+            lastScraped = nav?.last_scraped_at;
+            // TTL: 7 days
+            if (lastScraped && (Date.now() - lastScraped.getTime() < 7 * 24 * 60 * 60 * 1000)) return true;
+        } else if (type === 'CATEGORY') {
+            const cat = await this.prisma.category.findFirst({ where: { source_url: { contains: url } } });
+            lastScraped = cat?.last_scraped_at;
+            // TTL: 3 days
+            if (lastScraped && (Date.now() - lastScraped.getTime() < 3 * 24 * 60 * 60 * 1000)) return true;
+        } else if (type === 'PRODUCT') {
+            const prod = await this.prisma.product.findUnique({ where: { source_url: url } });
+            lastScraped = prod?.last_scraped_at;
+            // TTL: 24 hours
+            if (lastScraped && (Date.now() - lastScraped.getTime() < 24 * 60 * 60 * 1000)) return true;
+        }
+        return false;
+    }
+
+    private async updateEntityTimestamp(url: string, type: string) {
+        const now = new Date();
+        if (type === 'NAVIGATION') {
+            await this.prisma.navigation.updateMany({ data: { last_scraped_at: now } });
+        } else if (type === 'CATEGORY') {
+            await this.prisma.category.updateMany({
+                where: { source_url: { contains: url } },
+                data: { last_scraped_at: now }
+            });
+        }
     }
 }

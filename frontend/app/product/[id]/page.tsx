@@ -15,6 +15,8 @@ interface ProductDetail {
     product_detail?: {
         description: string;
         specs: any;
+        ratings_avg: number;
+        reviews_count: number;
     };
     source_url: string;
 }
@@ -111,6 +113,23 @@ export default function ProductPage() {
                                 </pre>
                             </div>
                         )}
+
+                        <div className="border-t pt-6">
+                            <h2 className="text-xl font-semibold mb-4">Reviews & Ratings</h2>
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="text-4xl font-bold">
+                                    {product.product_detail?.ratings_avg?.toFixed(1) || '0.0'}
+                                </div>
+                                <div className="text-gray-500">
+                                    out of 5 ({product.product_detail?.reviews_count || 0} reviews)
+                                </div>
+                            </div>
+
+                            {/* Placeholder for reviews list - implementing real reviews would require separate API call or relation inclusion */}
+                            <div className="bg-gray-50 dark:bg-zinc-800 p-4 rounded-lg text-center text-gray-500">
+                                No reviews available yet.
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>

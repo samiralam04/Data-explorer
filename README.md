@@ -27,7 +27,16 @@ The **Product Data Explorer** allows users to:
 
 ---
 
-## ⚙️ Setup & Installation
+### ⚡ Quick Start (One Command)
+To start everything (Database, Backend, Frontend) at once:
+
+```bash
+./start.sh
+```
+
+---
+
+### Manual Setup (Alternative)
 
 ### 1. Clone the Repository
 ```bash
@@ -43,15 +52,12 @@ docker-compose up -d
 *This starts PostgreSQL on port `5433` to avoid conflicts with default local instances.*
 
 ### 3. Backend Setup
+Open a terminal:
 ```bash
 cd backend
 npm install
-
-# Run Migrations to setup Database Schema
 npx prisma migrate dev
-
-# Start the Backend Server (Runs on Port 4001)
-npm run start
+PORT=4001 npm run start
 ```
 
 ### 4. Frontend Setup
@@ -59,12 +65,10 @@ Open a new terminal:
 ```bash
 cd frontend
 npm install
-
-# Start the Frontend Development Server (Runs on Port 3000/3001)
 npm run dev
 ```
 
-Visit `http://localhost:3001` (or the port shown in your terminal) to access the application.
+Visit `http://localhost:3000` to access the application.
 
 ---
 
@@ -101,7 +105,14 @@ Visit `http://localhost:3001` (or the port shown in your terminal) to access the
 *   **Cause:** The application was "guessing" URLs (e.g., `/category/slug`), but the site often uses `/collections/slug` or `/pages/slug`.
 *   **Fix Implemented:** Added `source_url` to the database. The scraper now saves exactly where it found the link, and the frontend uses this exact URL to trigger jobs.
 
----
+### Queue & Ethical Scraping (New)
+*   **Feature:** Implemented **BullMQ** + **Redis** to decouple scraping from API responses.
+*   **Behavior:** API calls return a Job ID immediately. The worker processes the job in the background with strict **rate limiting** (2s delay) and **concurrency control** (max 2).
+*   **Ethics:** TTL checks prevents re-scraping fresh data (Navigation: 7 days, Category: 3 days, Product: 24h).
+
+### API Documentation
+*   **Swagger UI:** Available at `http://localhost:4001/api/docs`.
+*   **DTO Validation:** All endpoints use `class-validator` to ensure data integrity.
 
 ## 📡 API Reference
 

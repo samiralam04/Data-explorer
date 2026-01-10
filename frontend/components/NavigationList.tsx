@@ -34,7 +34,18 @@ export default function NavigationList() {
         }
     });
 
-    if (isLoading) return <div className="p-4">Loading navigation...</div>;
+    if (isLoading) {
+        return (
+            <div className="w-full max-w-4xl mx-auto p-6 animate-pulse">
+                <div className="h-10 bg-gray-200 dark:bg-zinc-800 rounded mb-6 w-1/3"></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                        <div key={i} className="h-32 bg-gray-200 dark:bg-zinc-800 rounded-lg"></div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
     if (error) return <div className="p-4 text-red-500">Error loading navigation</div>;
 
     return (

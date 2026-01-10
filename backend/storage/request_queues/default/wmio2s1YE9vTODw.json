@@ -1,9 +1,0 @@
-{
-	"id": "wmio2s1YE9vTODw",
-	"json": "{\"id\":\"wmio2s1YE9vTODw\",\"url\":\"https://www.worldofbooks.com/en-gb/category/all-fiction-books\",\"loadedUrl\":\"https://www.worldofbooks.com/en-gb/category/all-fiction-books\",\"uniqueKey\":\"https://www.worldofbooks.com/en-gb/category/all-fiction-books\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2026-01-08T11:26:36.930Z\"}",
-	"method": "GET",
-	"orderNo": null,
-	"retryCount": 0,
-	"uniqueKey": "https://www.worldofbooks.com/en-gb/category/all-fiction-books",
-	"url": "https://www.worldofbooks.com/en-gb/category/all-fiction-books"
-}

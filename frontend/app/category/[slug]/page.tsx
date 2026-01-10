@@ -9,6 +9,8 @@ import { useState } from 'react';
 export default function CategoryPage() {
     const params = useParams();
     const slug = params?.slug as string;
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [scrapeStatus, setScrapeStatus] = useState<'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | null>(null);
     const [page, setPage] = useState(1);
 
     const { data, isLoading, error, refetch } = useQuery({
@@ -18,18 +20,43 @@ export default function CategoryPage() {
         retry: false
     });
 
+    // Poll for job status if we have a job ID and it's not finished
+    useQuery({
+        queryKey: ['scrapeJob', jobId],
+        queryFn: async () => {
+            if (!jobId) return null;
+            const res = await api.get(`/scrape/job/${jobId}`);
+            const status = res.data?.status;
+            setScrapeStatus(status);
+
+            if (status === 'DONE') {
+                setJobId(null); // Stop polling
+                refetch(); // Refresh product list
+                setScrapeStatus(null);
+            } else if (status === 'FAILED' || status === 'SKIPPED') {
+                setJobId(null); // Stop polling
+                alert(`Scrape finished with status: ${status}`);
+                setScrapeStatus(null);
+                refetch();
+            }
+            return res.data;
+        },
+        enabled: !!jobId,
+        refetchInterval: 2000, // Poll every 2 seconds
+        refetchIntervalInBackground: true
+    });
+
     const scrapeMutation = useMutation({
         mutationFn: () => {
-            // Use the source_url from the backend if available, otherwise fallback (though fallback might be wrong, it's better than nothing)
-            // If source_url is relative, prepend domain.
             let url = data?.category?.source_url || `https://www.worldofbooks.com/en-gb/category/${slug}`;
             if (url && url.startsWith('/')) {
                 url = `https://www.worldofbooks.com${url}`;
             }
             return api.post('/scrape/category', { url });
         },
-        onSuccess: () => {
-            alert('Scrape job started! Refresh in a few seconds.');
+        onSuccess: (res) => {
+            setJobId(res.data.id);
+            setScrapeStatus('PENDING');
         },
         onError: (err) => {
             alert('Failed to start scrape: ' + err.message);
@@ -43,11 +70,16 @@ export default function CategoryPage() {
                 <p className="mb-6">We don't have data for this category yet.</p>
                 <button
                     onClick={() => scrapeMutation.mutate()}
-                    disabled={scrapeMutation.isPending}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                    disabled={scrapeMutation.isPending || !!jobId}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                    {scrapeMutation.isPending ? 'Scraping...' : 'Scrape This Category'}
+                    {scrapeMutation.isPending || jobId ? 'Scraping in progress...' : 'Scrape This Category'}
                 </button>
+                {scrapeStatus && (
+                    <div className="mt-4 text-blue-500 animate-pulse">
+                        Status: {scrapeStatus}... Please wait.
+                    </div>
+                )}
             </div>
         )
     }
@@ -58,7 +90,15 @@ export default function CategoryPage() {
         <div className="min-h-screen bg-zinc-50 dark:bg-black p-6">
             <main className="container mx-auto">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-bold capitalize">{slug?.replace(/-/g, ' ')}</h1>
+                    <div>
+                        <h1 className="text-3xl font-bold capitalize">{slug?.replace(/-/g, ' ')}</h1>
+                        {scrapeStatus && (
+                            <div className="text-sm text-blue-600 mt-1 flex items-center gap-2">
+                                <span className="w-2 h-2 bg-blue-600 rounded-full animate-ping"></span>
+                                Scraping in progress: {scrapeStatus}
+                            </div>
+                        )}
+                    </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -78,9 +118,9 @@ export default function CategoryPage() {
                     </div>
                 </div>
 
-                <ProductGrid products={data?.data} isLoading={isLoading} />
+                <ProductGrid products={data?.data} isLoading={isLoading || scrapeStatus === 'RUNNING'} />
 
-                {data?.data?.length === 0 && !isLoading && (
+                {data?.data?.length === 0 && !isLoading && !jobId && (
                     <div className="text-center mt-10">
                         <p>No products found in this category.</p>
                         <button

@@ -58,6 +58,9 @@ model Product {
   reviews         Review[]
   
   @@index([slug])
+  @@index([source_id])
+  @@index([source_url])
+  @@index([last_scraped_at])
   // Slug might be derived from source_url or title, useful for frontend routing
   slug            String         @unique
 
