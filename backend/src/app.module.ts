@@ -6,6 +6,7 @@ import { ScrapeModule } from './scrape/scrape.module';
 import { QueueModule } from './queue/queue.module';
 import { HistoryModule } from './history/history.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { LoggerModule } from './logger/logger.module';
 import { NavigationController } from './navigation/navigation.controller';
 import { NavigationService } from './navigation/navigation.service';
 import { CategoryController } from './category/category.controller';
@@ -20,6 +21,7 @@ import { ProductService } from './product/product.service';
     ScrapeModule,
     QueueModule,
     HistoryModule,
+    LoggerModule,
   ],
   controllers: [AppController, NavigationController, CategoryController, ProductController],
   providers: [AppService, NavigationService, CategoryService, ProductService],

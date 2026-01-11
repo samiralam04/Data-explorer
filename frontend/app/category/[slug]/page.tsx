@@ -3,25 +3,40 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { fetcher, api } from '@/lib/api';
 import ProductGrid from '@/components/ProductGrid';
-import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Loader2, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function CategoryPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const slug = params?.slug as string;
+
+    // Get page from URL or default to 1
+    const pageParam = searchParams.get('page');
+    const page = pageParam ? parseInt(pageParam) : 1;
+    const limit = 20;
+
     const [jobId, setJobId] = useState<string | null>(null);
     const [scrapeStatus, setScrapeStatus] = useState<'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | null>(null);
-    const [page, setPage] = useState(1);
 
     const { data, isLoading, error, refetch } = useQuery({
-        queryKey: ['category', slug, page],
-        queryFn: () => fetcher(`/categories/${slug}/products?page=${page}`),
+        queryKey: ['category', slug, page], // React Query will cache per page key
+        queryFn: () => fetcher(`/categories/${slug}/products?page=${page}&limit=${limit}`),
         enabled: !!slug,
-        retry: false
+        retry: false,
+        staleTime: 5000, // Keep data fresh for a bit
+        placeholderData: (previousData) => previousData, // Smooth transition between pages
     });
 
-    // Poll for job status if we have a job ID and it's not finished
+    const handlePageChange = (newPage: number) => {
+        router.push(`?page=${newPage}&limit=${limit}`);
+    };
+
+    // ... (rest of simple logic)
+
+    // Poll for job status (same as before)
     useQuery({
         queryKey: ['scrapeJob', jobId],
         queryFn: async () => {
@@ -31,11 +46,11 @@ export default function CategoryPage() {
             setScrapeStatus(status);
 
             if (status === 'DONE') {
-                setJobId(null); // Stop polling
-                refetch(); // Refresh product list
+                setJobId(null);
+                refetch();
                 setScrapeStatus(null);
             } else if (status === 'FAILED' || status === 'SKIPPED') {
-                setJobId(null); // Stop polling
+                setJobId(null);
                 alert(`Scrape finished with status: ${status}`);
                 setScrapeStatus(null);
                 refetch();
@@ -43,7 +58,7 @@ export default function CategoryPage() {
             return res.data;
         },
         enabled: !!jobId,
-        refetchInterval: 2000, // Poll every 2 seconds
+        refetchInterval: 2000,
         refetchIntervalInBackground: true
     });
 
@@ -95,6 +110,8 @@ export default function CategoryPage() {
 
     if (error) return <div className="p-10 text-center text-destructive font-medium">Error loading category</div>;
 
+    const totalPages = data?.meta?.totalPages || 1;
+
     return (
         <div className="min-h-screen bg-background p-6 md:p-10">
             <main className="container mx-auto max-w-7xl">
@@ -110,15 +127,15 @@ export default function CategoryPage() {
                             </div>
                         )}
                         {!isScraping && (
-                            <p className="text-muted-foreground">Explore collected products from this category.</p>
+                            <p className="text-muted-foreground">My Collection. Page {page}.</p>
                         )}
                     </div>
 
                     <div className="flex items-center bg-card border border-border rounded-lg shadow-sm p-1">
                         <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            onClick={() => handlePageChange(Math.max(1, page - 1))}
                             disabled={page === 1 || isLoading}
-                            className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center gap-1"
+                            className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center gap-1 cursor-pointer"
                         >
                             <ChevronLeft size={16} /> Previous
                         </button>
@@ -126,9 +143,10 @@ export default function CategoryPage() {
                             {page}
                         </span>
                         <button
-                            onClick={() => setPage(p => p + 1)}
-                            disabled={isLoading || !data?.data?.length}
-                            className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center gap-1"
+                            onClick={() => handlePageChange(page + 1)}
+                            disabled={isLoading || (data?.data?.length < limit && page >= totalPages && data?.data?.length === 0)}
+                            // Using data length to determine if we should disable next, or use meta if available
+                            className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center gap-1 cursor-pointer"
                         >
                             Next <ChevronRight size={16} />
                         </button>

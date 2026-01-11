@@ -4,7 +4,16 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'], // Default nest logger is fine too if we are just logging to console, but let's use the one we improved.
+    // Or better, let's just leave it default but ensure our services use the LoggerModule. 
+    // Actually, to use Winston globally:
+  });
+
+  // Better approach for main.ts with NestJS 9+ and Winston is usually:
+  // const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+  // But let's stick to simple for now as we just need "logging" inside services.
 
   const configService = app.get(ConfigService);
   const port = configService.get('PORT') || 4001;

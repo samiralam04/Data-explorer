@@ -4,10 +4,18 @@ import Link from 'next/link';
 import { Search, ShoppingBag, Menu } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetcher } from '@/lib/api';
 
 export default function Navbar() {
     const router = useRouter();
     const [query, setQuery] = useState('');
+
+    const { data: navItems } = useQuery({
+        queryKey: ['navigation'],
+        queryFn: () => fetcher('/navigation'),
+        staleTime: 60000, // cache for 1 minute
+    });
 
     const handleSearch = () => {
         if (!query.trim()) return;
@@ -30,7 +38,7 @@ export default function Navbar() {
                 </Link>
 
                 {/* Search Bar (Hidden on mobile) */}
-                <div className="hidden md:flex items-center bg-secondary/50 px-3 py-2 rounded-full border border-transparent focus-within:border-primary/50 focus-within:bg-background transition-all w-96">
+                <div className="hidden md:flex items-center bg-secondary/50 px-3 py-2 rounded-full border border-transparent focus-within:border-primary/50 focus-within:bg-background transition-all w-64 lg:w-96">
                     <button
                         onClick={handleSearch}
                         className="p-1 hover:text-primary transition-colors"
@@ -52,16 +60,14 @@ export default function Navbar() {
                     <Link href="/about" className="hidden md:block text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
                         About
                     </Link>
+                    <Link href="/contact" className="hidden md:block text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+                        Contact
+                    </Link>
                     <button className="p-2 hover:bg-secondary rounded-full text-foreground transition-colors md:hidden">
                         <Menu size={20} />
                     </button>
                     <div className="hidden md:flex gap-2">
-                        <button className="px-4 py-2 text-sm font-medium text-primary bg-indigo-50 dark:bg-indigo-950/30 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
-                            Sign In
-                        </button>
-                        <button className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-full hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/20">
-                            Get Started
-                        </button>
+                        {/* Removed generic buttons, keeping links lean */}
                     </div>
                 </div>
             </div>

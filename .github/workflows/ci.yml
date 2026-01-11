@@ -2,66 +2,51 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 jobs:
-  backend-check:
+  build-and-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
 
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Use Node.js 20
+
+    - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: backend/package-lock.json
+        cache-dependency-path: '**/package-lock.json'
 
-    - name: Install dependencies
-      run: npm ci
+    # Backend
+    - name: Install Backend Dependencies
+      run: cd backend && npm ci
 
-    - name: Generate Prisma Client
-      run: npx prisma generate
+    - name: Lint Backend
+      run: cd backend && npm run lint
 
-    - name: Lint
-      # run: npm run lint 
-      # Commenting out lint for now to avoid blocking on style issues, can enable later
-      run: echo "Lint check skipped"
+    # Unit tests only (e2e requires DB)
+    - name: Test Backend (Unit)
+      run: cd backend && npm run test
 
-    - name: Build
-      run: npm run build
+    - name: Build Backend
+      run: cd backend && npm run build
 
-    - name: Test
-      run: npm run test
+    # Frontend
+    - name: Install Frontend Dependencies
+      run: cd frontend && npm ci
 
-  frontend-check:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
+    - name: Lint Frontend
+      run: cd frontend && npm run lint
 
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+    # - name: Test Frontend (Component)
+    #   run: cd frontend && npm run test
 
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Lint
-      # run: npm run lint
-      run: echo "Lint check skipped"
-
-    - name: Build
-      run: npm run build
+    - name: Build Frontend
+      run: cd frontend && npm run build
