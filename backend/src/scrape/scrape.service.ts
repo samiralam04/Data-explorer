@@ -79,6 +79,9 @@ export class ScrapeService implements OnModuleInit {
         });
 
         this.crawler = new PlaywrightCrawler({
+            launchContext: {
+                userAgent: 'ProductDataExplorer/1.0 (+http://localhost:3000)',
+            },
             requestHandler: async ({ page, request, log }) => {
                 log.info(`Processing ${request.url} ...`);
 
@@ -279,37 +282,66 @@ export class ScrapeService implements OnModuleInit {
             const author = (document.querySelector('.product-author, .author') as HTMLElement)?.innerText?.trim();
             const priceText = (document.querySelector('.price') as HTMLElement)?.innerText?.trim();
             const description = document.querySelector('.description, .product-description')?.innerHTML;
-            const specs = {}; // Extract parsing logic here if needed
+            const specs = {};
 
-            // Extract ISBN if possible
-            // This logic depends on exact structure 
+            // Extract Reviews
+            const reviewElements = document.querySelectorAll('.review-item, .feefo-review');
+            const reviews = Array.from(reviewElements).map(el => ({
+                author: (el.querySelector('.review-author, .feefo-review-author') as HTMLElement)?.innerText?.trim() || 'Anonymous',
+                rating: parseFloat((el.querySelector('.rating, .star-rating') as HTMLElement)?.getAttribute('data-rating') || '0') || 5, // Default to 5 if structure unclear
+                text: (el.querySelector('.review-text, .feefo-review-description') as HTMLElement)?.innerText?.trim() || ''
+            }));
+
+            // Calculate aggregated
+            const ratingsAvg = reviews.length > 0 ? reviews.reduce((a, b) => a + b.rating, 0) / reviews.length : 0;
 
             return {
                 title,
                 author,
                 price: priceText?.replace(/[^\d.]/g, ''),
                 description,
-                specs
+                specs,
+                reviews,
+                ratingsAvg,
+                reviewsCount: reviews.length
             };
         });
 
         const product = await this.prisma.product.findUnique({ where: { source_url: url } });
-        if (!product) return; // Should exist if job created correctly or upsert here
+        if (!product) return;
 
         await this.prisma.productDetail.upsert({
             where: { product_id: product.id },
             update: {
                 description: data.description,
                 specs: data.specs,
+                ratings_avg: data.ratingsAvg,
+                reviews_count: data.reviewsCount
             },
             create: {
                 product_id: product.id,
                 description: data.description,
                 specs: data.specs,
-                reviews_count: 0,
-                ratings_avg: 0
+                reviews_count: data.reviewsCount,
+                ratings_avg: data.ratingsAvg
             }
         });
+
+        // Save Reviews
+        if (data.reviews.length > 0) {
+            // Clear old reviews to avoid duplicates/stale data
+            await this.prisma.review.deleteMany({ where: { product_id: product.id } });
+
+            await this.prisma.review.createMany({
+                data: data.reviews.map(r => ({
+                    product_id: product.id,
+                    author: r.author,
+                    rating: r.rating,
+                    text: r.text
+                }))
+            });
+            this.logger.log(`Saved ${data.reviews.length} reviews for ${product.title}`);
+        }
     }
 
     private async isFresh(url: string, type: string): Promise<boolean> {

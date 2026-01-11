@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScrapeModule } from './scrape/scrape.module';
+import { QueueModule } from './queue/queue.module';
+import { HistoryModule } from './history/history.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { NavigationController } from './navigation/navigation.controller';
 import { NavigationService } from './navigation/navigation.service';
@@ -16,6 +18,8 @@ import { ProductService } from './product/product.service';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     ScrapeModule,
+    QueueModule,
+    HistoryModule,
   ],
   controllers: [AppController, NavigationController, CategoryController, ProductController],
   providers: [AppService, NavigationService, CategoryService, ProductService],

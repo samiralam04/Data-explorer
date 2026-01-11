@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import React from 'react';
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 import HistoryTracker from "@/components/HistoryTracker";
+import Navbar from "@/components/Navbar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -27,11 +31,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${plusJakarta.variable} antialiased font-sans bg-zinc-50 dark:bg-black text-slate-900 dark:text-slate-100 selection:bg-indigo-500/30`}
       >
         <Providers>
-          <HistoryTracker />
-          {children}
+          <React.Suspense fallback={null}>
+            <HistoryTracker />
+          </React.Suspense>
+          <Navbar />
+          <div className="pt-0">
+            {children}
+          </div>
         </Providers>
       </body>
     </html>

@@ -16,7 +16,7 @@ export class ScrapeController {
     @ApiOperation({ summary: 'Trigger navigation scrape' })
     async scrapeNavigation() {
         const job = await this.scrapeService.addJob('https://www.worldofbooks.com', 'NAVIGATION');
-        await this.scrapeQueue.addScrapeJob(job.id);
+        await this.scrapeQueue.addScrapeJob(job.id, 'NAVIGATION');
         return job;
     }
 
@@ -25,7 +25,7 @@ export class ScrapeController {
     @ApiBody({ type: ScrapeRequestDto })
     async scrapeCategory(@Body() body: ScrapeRequestDto) {
         const job = await this.scrapeService.addJob(body.url, 'CATEGORY');
-        await this.scrapeQueue.addScrapeJob(job.id);
+        await this.scrapeQueue.addScrapeJob(job.id, 'CATEGORY');
         return job;
     }
 
@@ -34,7 +34,7 @@ export class ScrapeController {
     @ApiBody({ type: ScrapeRequestDto })
     async scrapeProduct(@Body() body: ScrapeRequestDto) {
         const job = await this.scrapeService.addJob(body.url, 'PRODUCT');
-        await this.scrapeQueue.addScrapeJob(job.id);
+        await this.scrapeQueue.addScrapeJob(job.id, 'PRODUCT');
         return job;
     }
 

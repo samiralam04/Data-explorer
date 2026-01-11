@@ -7,4 +7,9 @@ export const api = axios.create({
     },
 });
 
+
 export const fetcher = (url: string) => api.get(url).then((res) => res.data);
+
+export const saveHistory = async (sessionId: string, pathJson: any[]) => {
+    return api.post('/history', { sessionId, pathJson });
+};

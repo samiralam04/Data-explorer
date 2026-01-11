@@ -6,12 +6,6 @@ async function main() {
   console.log('Seeding database...');
 
   // 1. Clear existing data (optional, be careful in prod)
-  // await prisma.scrapeJob.deleteMany();
-  // await prisma.review.deleteMany();
-  // await prisma.productDetail.deleteMany();
-  // await prisma.product.deleteMany();
-  // await prisma.category.deleteMany();
-  // await prisma.navigation.deleteMany();
 
   // 2. Default Navigation Items (based on WOB typical nav)
   const navItems = [

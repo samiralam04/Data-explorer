@@ -1,146 +1,104 @@
 # Product Data Explorer
 
-A full-stack web application designed to scrape, store, and explore product data from *World of Books*, featuring a robust scraping engine, a persistent database, and a responsive frontend interface.
+A full-stack application to explore, scrape, and analyze product data from World of Books.
 
-## 🚀 Project Overview
+## 🚀 Features
 
-The **Product Data Explorer** allows users to:
-1.  **Scrape Navigation**: Automatically discover all book categories from the source website.
-2.  **Scrape Categories**: Intelligently crawl categories to find products, handling different page layouts (`/collections/` vs `/pages/`).
-3.  **Explore Data**: Browse scraped categories and products via a modern web interface.
-4.  **Deduplicate Data**: Ensures data integrity by filtering out "ghost" products (placeholder entries) in favor of valid data.
+- **On-Demand Scraping**: Uses Playwright + BullMQ to scrape data asynchronously.
+- **Queue System**: Redis-backed queue ensures non-blocking operations.
+- **Ethical Scraping**: Respects `robots.txt`, implements delays, and uses caching (TTL).
+- **Browsing History**: Tracks user navigation and saves to PostgreSQL.
+- **Rich Frontend**: Next.js 14, React Query, and Tailwind CSS.
+- **API Documentation**: Full Swagger UI.
 
-### 🏗️ Tech Stack
+## 🛠 Tech Stack
 
-*   **Backend**: NestJS (TypeScript), Prisma ORM, Crawlee + Playwright (Headless Browser Scraping).
-*   **Database**: PostgreSQL (Persistence), Redis (Queue/Caching - *Prepared*).
-*   **Frontend**: Next.js 14 (App Router), React Query, Tailwind CSS.
-*   **Infrastructure**: Docker & Docker Compose.
+- **Backend**: NestJS, Prisma, PostgreSQL, BullMQ, Redis, Playwright.
+- **Frontend**: Next.js 14 (App Router), React Query, Tailwind CSS.
+- **DevOps**: Docker Compose.
+
+## 🏗 Architecture
+
+```mermaid
+graph TD
+    Client[Frontend (Next.js)] -->|HTTP| API[Backend (NestJS)]
+    API -->|Enqueue| Redis[Redis Queue]
+    API -->|Read/Write| DB[(PostgreSQL)]
+    Worker[Scrape Worker] -->|Listen| Redis
+    Worker -->|Scrape| WOB[World of Books]
+    Worker -->|Update| DB
+```
+
+## 📦 Database Schema
+
+Key models:
+- `Product`: Stores core product info (Price, Title, Image).
+- `ProductDetail`: Stores detailed specs, description, ratings.
+- `Review`: Stores user reviews.
+- `ViewHistory`: Tracks user sessions.
+- `ScrapeJob`: Tracks background scraping status.
+
+## 🚦 Setup Instructions
+
+1. **Clone & Install**
+   ```bash
+   git clone <repo>
+   cd product-data-explorer
+   ```
+
+2. **Environment Variables**
+   Create `.env` in `backend` and `frontend`.
+   Example `backend/.env`:
+   ```env
+   DATABASE_URL="postgresql://admin:admin123@localhost:5433/product_data_explorer?schema=public"
+   REDIS_HOST=localhost
+   REDIS_PORT=6379
+   PORT=4001
+   ```
+
+3. **Start Application (Docker)**
+   The easiest way to run the full stack (Frontend, Backend, Postgres, Redis):
+   ```bash
+   docker-compose up --build
+   ```
+   - Frontend: [http://localhost:3000](http://localhost:3000)
+   - Backend API: [http://localhost:3001/api/docs](http://localhost:3001/api/docs)
+
+4. **Run Tests**
+   ```bash
+   cd backend
+   npm install
+   npm run test
+   ```
+
+## 🔄 CI/CD
+
+This project uses **GitHub Actions** for continuous integration:
+- **Backend Check**: Lints, Builds, and runs Unit Tests on every push.
+- **Frontend Check**: Lints and Builds on every push.
+
+
+6. **Access**
+   - Frontend: [http://localhost:3000](http://localhost:3000)
+   - API Docs: [http://localhost:4001/api/docs](http://localhost:4001/api/docs)
+
+## 🛡 Ethical Scraping
+
+We adhere to strict ethical guidelines:
+- **Rate Limiting**: Max 2 concurrent requests.
+- **Delays**: 2-second delay between actions.
+- **TTL Caching**:
+  - Navigation: 7 days
+  - Categories: 3 days
+  - Products: 24 hours
+- **User-Agent**: Custom `ProductDataExplorer/1.0`.
+
+## 🧪 Verification
+
+1. Go to `http://localhost:3000`.
+2. Browse categories.
+3. Click "Refresh Data" on a product.
+4. Check Swagger docs for API details.
 
 ---
-
-## 🛠️ Prerequisites
-
-*   **Node.js** (v18 or higher)
-*   **Docker Desktop** (for PostgreSQL)
-*   **npm** or **yarn**
-
----
-
-### ⚡ Quick Start (One Command)
-To start everything (Database, Backend, Frontend) at once:
-
-```bash
-./start.sh
-```
-
----
-
-### Manual Setup (Alternative)
-
-### 1. Clone the Repository
-```bash
-git clone <repository_url>
-cd product-data-explorer
-```
-
-### 2. Start Infrastructure (PostgreSQL)
-Ensure Docker is running, then start the database container:
-```bash
-docker-compose up -d
-```
-*This starts PostgreSQL on port `5433` to avoid conflicts with default local instances.*
-
-### 3. Backend Setup
-Open a terminal:
-```bash
-cd backend
-npm install
-npx prisma migrate dev
-PORT=4001 npm run start
-```
-
-### 4. Frontend Setup
-Open a new terminal:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Visit `http://localhost:3000` to access the application.
-
----
-
-## 📖 Usage Guide
-
-### Scrape Navigation
-1.  On the homepage, you will see a sidebar or a "Scrape Navigation" button.
-2.  Click **"Scrape Navigation"**.
-3.  This will crawl the main menu of *World of Books* and populate the database with categories (e.g., "Fiction Books", "Rare Books").
-4.  *Note: This process takes about 30-60 seconds.*
-
-### Scrape Products
-1.  Click on any category from the list (e.g., **"Fiction Books"**).
-2.  If the category is empty, click the **"Try Scraping"** button (or "Scrape This Category").
-3.  The backend will spawn a Playwright browser to:
-    *   Navigate to the correct source URL (handling both `/collections/` and `/pages/` layouts).
-    *   Extract product titles, authors, prices, and images.
-    *   **Deduplicate** entries to ensure "Unknown Title" placeholders don't overwrite good data.
-4.  Refresh the page after ~30 seconds to see the products appear.
-
----
-
-## 🐛 Troubleshooting & Fixes
-
-### "Unknown Title" Issue
-*   **Problem:** Products were appearing with "Unknown Title" and £0.00 price.
-*   **Cause:**
-    1.  The website uses two different layouts: `/collections/` (Grid) and `/pages/` (Landing). The landing page layout used a different container class (`.product-card-wrapper`).
-    2.  The scraper selector was failing to find the title inside the container.
-*   **Fix Implemented:** Updated `ScrapeService` to support multiple container selectors (`.product-card-wrapper`, `.main-product-card`) and corrected the title extraction logic. Added deduplication to prioritize valid titles.
-
-### 404 Errors During Scraping
-*   **Problem:** Scraping failed with 404 errors for certain categories.
-*   **Cause:** The application was "guessing" URLs (e.g., `/category/slug`), but the site often uses `/collections/slug` or `/pages/slug`.
-*   **Fix Implemented:** Added `source_url` to the database. The scraper now saves exactly where it found the link, and the frontend uses this exact URL to trigger jobs.
-
-### Queue & Ethical Scraping (New)
-*   **Feature:** Implemented **BullMQ** + **Redis** to decouple scraping from API responses.
-*   **Behavior:** API calls return a Job ID immediately. The worker processes the job in the background with strict **rate limiting** (2s delay) and **concurrency control** (max 2).
-*   **Ethics:** TTL checks prevents re-scraping fresh data (Navigation: 7 days, Category: 3 days, Product: 24h).
-
-### API Documentation
-*   **Swagger UI:** Available at `http://localhost:4001/api/docs`.
-*   **DTO Validation:** All endpoints use `class-validator` to ensure data integrity.
-
-## 📡 API Reference
-
-The backend runs on `http://localhost:4001`.
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/scrape/navigation` | Triggers a full navigation scrape. |
-| `POST` | `/scrape/category` | Triggers scraping for a specific category URL. Body: `{ "url": "..." }` |
-| `GET` | `/navigation` | Returns all navigation items. |
-| `GET` | `/categories/:slug/products` | Returns products for a specific category. |
-
----
-
-## 📂 Project Structure
-
-```
-product-data-explorer/
-├── backend/            # NestJS Application
-│   ├── src/
-│   │   ├── scrape/     # Scraping Logic (Crawlee + Playwright)
-│   │   ├── category/   # Category Management
-│   │   └── product/    # Product Management
-│   └── prisma/         # Database Schema
-│
-├── frontend/           # Next.js Application
-│   ├── app/            # App Router Pages
-│   └── components/     # UI Components
-│
-└── docker-compose.yml  # Database Configuration
-```
+Part of Assignment.

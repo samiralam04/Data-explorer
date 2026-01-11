@@ -1,91 +1,52 @@
 'use client';
 
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { fetcher, api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { fetcher } from '@/lib/api';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { Book, ChevronRight } from 'lucide-react';
+import { SkeletonNavigation } from './skeletons';
 
-interface SubCategory {
+interface NavigationItem {
     id: string;
     title: string;
     slug: string;
-}
-
-interface NavItem {
-    id: string;
-    title: string;
-    slug: string;
-    categories: SubCategory[];
 }
 
 export default function NavigationList() {
-    const { data, isLoading, error, refetch } = useQuery<NavItem[]>({
+    const { data: navItems, isLoading, error } = useQuery<NavigationItem[]>({
         queryKey: ['navigation'],
         queryFn: () => fetcher('/navigation'),
     });
 
-    const scrapeMutation = useMutation({
-        mutationFn: () => api.post('/scrape/navigation'),
-        onSuccess: () => {
-            alert('Scrape job started!');
-            // refetch interval or notification
-        },
-        onError: (err) => {
-            alert('Failed to start scrape: ' + err.message);
-        }
-    });
-
-    if (isLoading) {
-        return (
-            <div className="w-full max-w-4xl mx-auto p-6 animate-pulse">
-                <div className="h-10 bg-gray-200 dark:bg-zinc-800 rounded mb-6 w-1/3"></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[...Array(6)].map((_, i) => (
-                        <div key={i} className="h-32 bg-gray-200 dark:bg-zinc-800 rounded-lg"></div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-    if (error) return <div className="p-4 text-red-500">Error loading navigation</div>;
+    if (isLoading) return <SkeletonNavigation />;
+    if (error) return <div className="text-center text-destructive py-10">Error loading navigation</div>;
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Product Data Explorer</h1>
-                <button
-                    onClick={() => scrapeMutation.mutate()}
-                    disabled={scrapeMutation.isPending}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {navItems?.map((item, index) => (
+                <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05, duration: 0.3 }}
                 >
-                    {scrapeMutation.isPending ? 'Starting...' : 'Scrape Navigation'}
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {data?.map((nav) => (
-                    <div key={nav.id} className="border rounded-lg p-4 hover:shadow-lg transition bg-white dark:bg-zinc-900">
-                        <Link href={`/category/${nav.slug}`} className="text-xl font-semibold mb-2 hover:text-blue-500 block">
-                            {nav.title}
-                        </Link>
-                        <div className="text-sm text-gray-500 mb-4">
-                            {nav.categories?.length || 0} top categories
+                    <Link
+                        href={`/category/${item.slug}`}
+                        className="group flex items-center justify-between p-6 bg-card border border-border rounded-xl hover:shadow-lg hover:shadow-indigo-500/5 hover:border-primary/30 transition-all duration-300"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-secondary rounded-lg group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/30 group-hover:text-primary transition-colors">
+                                <Book size={24} />
+                            </div>
+                            <span className="font-heading font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
+                                {item.title}
+                            </span>
                         </div>
-                        <div className="space-y-1">
-                            {nav.categories?.slice(0, 5).map(cat => (
-                                <Link key={cat.id} href={`/category/${cat.slug}`} className="block text-blue-600 hover:underline">
-                                    {cat.title}
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {data?.length === 0 && (
-                <div className="text-center p-10 text-gray-500">
-                    No navigation data found. Click "Scrape Navigation" to fetch data from source.
-                </div>
-            )}
+                        <ChevronRight className="text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" size={20} />
+                    </Link>
+                </motion.div>
+            ))}
         </div>
     );
 }
