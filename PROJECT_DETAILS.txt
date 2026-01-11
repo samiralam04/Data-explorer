@@ -1,0 +1,120 @@
+Product Data Explorer - Deep Dive & Interview Review
+====================================================
+
+1. Project Overview
+-------------------
+Product Data Explorer is a sophisticated web application that collects, processes, and visualizes product data (specifically books) from external e-commerce sites. It distinguishes itself by using a microservices-inspired architecture with asynchronous job queues, ensuring the application remains responsive even during heavy scraping operations.
+
+2. Technology Stack & Why We Chose It
+-------------------------------------
+*   **Next.js 15 (Frontend)**: Chosen for its hybrid rendering (Server Components for SEO and speed, Client Components for interactivity) and latest React 19 features.
+*   **NestJS (Backend)**: Provides a structured, opinionated architecture (Modules, Controllers, Services) that scales better than Express. It uses Dependency Injection, making testing and maintenance easier.
+*   **PostgreSQL + Prisma**: Postgres is a robust relational database ideal for structured product data. Prisma provides type-safety, preventing SQL injection and runtime errors.
+*   **BullMQ + Redis**: Crucial for background processing. Scraping is slow and unreliable; we offload it to a queue so the API responds instantly, while workers process jobs in the background. Redis stores the queue state.
+*   **Playwright + Crawlee**: Playwright controls actual browser instances (Headless Chrome), allowing us to scrape dynamic Single Page Applications (SPAs) that ordinary HTTP requests (like Axios) can't handle.
+
+3. The Lifecycle of a Scrape Request (How It Works)
+---------------------------------------------------
+*Step 1: The Trigger*
+The user clicks "Scrape This Category" on the frontend.
+-> Frontend calls `POST /api/scrape/category` with the URL.
+
+*Step 2: The API Layer*
+The Backend `ScrapeController` receives the request.
+-> It validates the input (Ensure it's a URL).
+-> It calls `ScrapeService.addJob()`.
+-> The Service checks the database: *Have we scraped this recently? (TTL Check)*.
+   - If YES: Returns the existing data (Caching/Optimization).
+   - If NO: It adds a job to the `BullMQ` queue with status `PENDING`.
+
+*Step 3: The Job Queue (Asynchronous Processing)*
+The API responds "Job Started" immediately to the User. The User sees a "Scraping..." spinner.
+-> In the background, `ScrapeWorker` picks up the job from Redis.
+-> `ScrapeWorker` calls `ScrapeService.processJob()`.
+
+*Step 4: The Execution (The Heavy Lifting)*
+`Playwright` launches a headless browser.
+-> It navigates to the target URL.
+-> **Ethical Pause**: It waits (e.g., 2 seconds) to be polite to the target server.
+-> It extracts data: Titles, Prices, Images, Reviews.
+-> It cleans the data (Removes "£" signs, trims whitespace).
+
+*Step 5: Persistence*
+The `ScrapeService` saves the data to Postgres using Prisma.
+-> It uses `upsert` (Update if exists, Insert if new) to avoid duplicates.
+-> It updates the Job Status to `DONE`.
+
+*Step 6: The Update*
+The Frontend polls the status (or uses WebSockets).
+-> Sees status is `DONE`.
+-> Refetches the product list.
+-> The User sees the new books appear dynamically.
+
+4. Codebase Walkthrough (Interview Prep)
+----------------------------------------
+**Why do you need to know this?**
+In an interview, you'll be asked: "Where does the business logic live?" or "How do you handle race conditions?". Knowing these files proves you understand the architecture.
+
+### BACKEND (`/backend/src`)
+
+**1. `app.module.ts`**
+*   **What**: The root module. It bundles the `ScrapeModule`, `QueueModule`, `PrismaModule`, etc.
+*   **Why**: NestJS needs to know how to wire the application together.
+
+**2. `scrape/scrape.controller.ts`**
+*   **What**: The API Endpoints (`POST /scrape`, `GET /scrape/job/:id`).
+*   **Why**: It handles HTTP requests, validating input before passing it to the implementation (Service). It's the "Front Door" of the backend.
+
+**3. `scrape/scrape.service.ts`**
+*   **What**: The Business Logic. Contains `addJob`, `processJob`, `handleCategory`, `handleProduct`.
+*   **Why**: This is the heart of the scraper. It contains the Playwright selectors (e.g., `.product-title`) and the logic to save to the database.
+
+**4. `queue/scrape.queue.ts`**
+*   **What**: Configures the BullMQ Queue ("scrape-queue").
+*   **Why**: We need to define the queue settings (retries, backoff strategy) so workers know how to behave.
+
+**5. `queue/scrape.worker.ts`**
+*   **What**: The background processor. It listens for 'job' events.
+*   **Why**: Separation of concerns. The Controller handles users; the Worker handles heavy computation/scraping. This prevents the API from hanging.
+
+**6. `prisma/schema.prisma`**
+*   **What**: The Database definition (Models: `Product`, `Category`, `ScrapeJob`).
+*   **Why**: Defines the shape of our data and their relationships (A Category has many Products).
+
+### FRONTEND (`/frontend/app`)
+
+**1. `lib/api.ts`**
+*   **What**: The Axios instance and helper functions.
+*   **Why**: Centralizes API configuration (Base URL) so we don't hardcode `localhost:3000` everywhere.
+
+**2. `providers.tsx`**
+*   **What**: Wraps the app in `QueryClientProvider` (React Query).
+*   **Why**: Allows any component to fetch data, cache it, and handle loading states effortlessly.
+
+**3. `app/category/[slug]/page.tsx`**
+*   **What**: A dynamic route page. Uses `path params` (`[slug]`) to know which category to load.
+*   **Why**: Demonstrates how Next.js handles dynamic routing. It uses React Query to fetch data and poll for scrape status.
+
+**4. `components/Navbar.tsx`**
+*   **What**: The top navigation bar.
+*   **Why**: Contains logic for the Search Bar (redirecting to `/category/search-term`) and glassmorphism styling.
+
+5. Key Questions & Answers
+--------------------------
+**Q: How do you handle duplicate data?**
+A: "I use `upsert` queries in Prisma. I define unique constraints using the source URL. If we scrape the same URL twice, it updates the existing record instead of creating a new one."
+
+**Q: Why use a Queue? Why not just `await scrape()`?**
+A: "Scraping takes time (seconds to minutes). If we `await` it in the Controller, the user's browser would freeze or timeout. A queue allows us to acknowledge the request immediately ('Job ID: 123') and process it asynchronously."
+
+**Q: How do you ensure you don't get blocked by the target site?**
+A: "I implemented 'Ethical Scraping' practices:
+    1. Delays (`setTimeout`) between requests.
+    2. Concurrency Limits (BullMQ processes max 2 jobs at once).
+    3. User-Agent rotation (configured in Playwright)."
+
+**Q: What was the hardest bug you solved?**
+A: "We had a circular dependency between `ScrapeModule` and `QueueModule`. The Worker needed the Service, but the Service needed the Queue. I solved it using NestJS `forwardRef()` to defer resolution."
+
+---------------------------------------------------------
+Generated by Antigravity Agent - 2026-01-11

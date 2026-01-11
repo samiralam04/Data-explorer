@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Function to handle shutdown
 cleanup() {
     echo "Stopping all services..."
