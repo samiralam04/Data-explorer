@@ -20,8 +20,6 @@ export default function HistoryTracker() {
         const updatedHistory = [newEntry, ...history].slice(0, 50); // Keep last 50
         localStorage.setItem('pde_history', JSON.stringify(updatedHistory));
 
-        // Optional: Send to backend (fire and forget)
-        // fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, { ... })
 
         console.log(`Navigated to: ${fullPath}`);
     }, [pathname, searchParams]);

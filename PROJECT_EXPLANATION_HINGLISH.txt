@@ -1,0 +1,133 @@
+# Product Data Explorer - Project Explanation (Hinglish)
+
+## 1. Project Introduction (Project Kya Hai?)
+**Product Data Explorer** ek full-stack web application hai jo web scraping ka use karke alag-alag sources se product data collect karta hai aur user ko ek clean interface me dikhata hai.
+
+Iska main kaam hai:
+1.  Web se data scrape karna (Products, Categories, Prices, Reviews).
+2.  Data ko database me store karna.
+3.  User ko frontend pe data dikhana aur interact karne dena.
+
+---
+
+## 2. Why We Need This Tech? (Ye Tech Stack Kyun Use Kiya?)
+
+Is project me humne **Next.js (Frontend)** aur **NestJS (Backend)** use kiya hai. Chaliye samajhte hain kyun:
+
+### Backend: NestJS
+*   **Kyun?**: NestJS ek framework hai jo Node.js pe bana hai. Ye kaafi structured hai (Angular jaisa) aur enterprise-level apps ke liye best hai.
+*   **Fayda**: Isme Modules, Controllers, aur Services alag-alag hote hain, jisse code clean rehta hai aur maintain karna aasaan hota hai.
+*   **Key Features**:
+    *   **TypeScript Support**: Type safety milti hai, yani errors kam aate hain.
+    *   **Dependency Injection**: Code ko loosely coupled rakhta hai (ek part dusre pe puri tarah dependent nahi hota).
+
+### Frontend: Next.js + Tailwind CSS
+*   **Kyun?**: Next.js React ka framework hai jo SEO aur performance ke liye best hai. Tailwind CSS design ko fast aur responsive banata hai.
+*   **Fayda**: Server-Side Rendering (SSR) milti hai, jisse page jaldi load hota hai aur Google search me aasaani se aata hai.
+
+### Database: PostgreSQL + Prisma
+*   **Kyun?**: PostgreSQL ek powerful relational database hai. Prisma ek ORM (Object-Relational Mapper) hai jo database se baat karna aasaan banata hai.
+*   **Fayda**: SQL queries likhne ki zaroorat nahi padti, JavaScript function se hi database operate ho jata hai.
+
+### Queue Management: BullMQ + Redis
+*   **Kyun?**: Scraping heavy task hai. Agar user click kare aur hum usi waqt scrape karein, to wait karna padega. Isliye hum BullMQ use karte hain jo background me kaam karta hai.
+*   **Fayda**: User request bhejta hai, backend job queue me dalta hai, aur user ko wait nahi karna padta.
+
+---
+
+## 3. Project Workflow (Kaam Kaise Karta Hai?)
+
+1.  **User Trigger**: User frontend se "Refresh Data" button dabata hai.
+2.  **API Call**: Frontend backend ko request bhejta hai (`/scrape/trigger`).
+3.  **Queue Job**: Backend request ko BullMQ queue me daal deta hai.
+4.  **Worker**: Ek background worker job uthata hai aur scraping shuru karta hai.
+5.  **Scraping**: `Cheerio` library use karke HTML page downloader hota hai aur data extract kiya jata hai.
+6.  **Database Save**: Scrape kiya hua data Prisma ke through PostgreSQL me save hota hai.
+7.  **Display**: Frontend `React Query` use karke naya data fetch karta hai aur user ko dikhata hai.
+
+---
+
+## 4. Code File Details (Har File Ka Kaam)
+
+### Backend (`/backend/src`)
+
+#### `app.module.ts`
+Ye pure application ka root module hai. Yahan saare dusre modules (Product, Category, Scrape) import kiye jate hain. Jaise ghar ka main switch board.
+
+#### `main.ts`
+Application ka entry point. Yahan server start hota hai (usually port 3000 pe) aur global settings lagayi jati hain (jaise CORS, Validation Pipes).
+
+#### Folder: `src/scrape`
+Scraping logic yahan hai.
+*   **scrape.controller.ts**: API endpoints define karta hai (e.g., POST `/scrape`).
+*   **scrape.service.ts**: Asli logic yahan hai. Ye decide karta hai ki kaise scrape karna hai.
+*   **scrape.processor.ts**: BullMQ ka worker jo background me queue se jobs uthata hai aur execute karta hai.
+
+#### Folder: `src/product`
+Product data manage karne ke liye.
+*   **product.controller.ts**: GET `/products` request handle karta hai.
+*   **product.service.ts**: Database se products fetch karne ka logic.
+
+#### Folder: `src/prisma`
+Database connection ke liye.
+*   **prisma.service.ts**: Ye database connect karta hai aur har jagah use hota hai query chalane ke liye.
+
+#### Folder: `src/logger`
+Logging ke liye taaki pata chale system me kya ho raha hai (Error logs, Info logs).
+
+---
+
+### Frontend (`/frontend`)
+
+#### Folder: `app` (Next.js App Router)
+*   **page.tsx**: Home page. Yahan products ki list dikhti hai.
+*   **layout.tsx**: Ye page ka design structure hai (Header, Footer jo har page pe same rehta hai).
+*   **globals.css**: Pure project ki CSS styles.
+
+#### Folder: `app/category/[slug]`
+Ye dynamic route hai. Agar URL `/category/books` hai, to `[slug]` ki value 'books' hogi aur us hisaab se page load hoga.
+
+#### Folder: `components`
+Reusable UI parts.
+*   **Navbar.tsx**: Upar ka menu bar.
+*   **ProductCard.tsx**: Ek single product ka card design.
+*   **ProductGrid.tsx**: Products ki list ko grid layout me dikhane wala component.
+
+#### Folder: `lib`
+Helper functions aur configurations.
+*   **utils.ts**: Chote-mote functions jo baar-baar use hote hain (e.g., class names merge karna).
+
+---
+
+## 5. Summary (Nichod)
+Ye project ek complete example hai ki kaise modern web apps banti hain. 
+1.  **Frontend** cheezein dikhata hai (Next.js).
+2.  **Backend** logic handle karta hai (NestJS).
+3.  **Database** data store karta hai (PostgreSQL).
+4.  **Worker** heavy kaam background me karta hai (BullMQ).
+5.  **Scraper** internet se data lata hai (Cheerio).
+
+Is architecture ko "Microservices capable" architecture kehte hain kyunki har part alag se manage kiya ja sakta hai.
+
+---
+
+## 6. Why Docker? (Docker Kyun Zaroori Hai?)
+
+Docker ek tool hai jo application ko "Containers" me pack karta hai. Sochiye jaise aap ek tiffin box pack karte hain - usme khana, chamach, tissue sab hota hai. Waise hi Docker container me code, libraries, system tools sab kuch hota hai jo app chalane ke liye chahiye, taaki wo kisi bhi computer pe same tareeke se chale.
+
+### Hum Is Project Me Docker Kyun Use Kar Rahe Hain?
+
+1.  **"Mere laptop pe to chal raha tha" Problem Khatam**:
+    *   Aksar hota hai ki code developer ke laptop pe chalta hai par server pe deploy karne par fat jata hai kyunki wahan versions alag hote hain.
+    *   Docker ke saath, agar container aapke laptop pe chalta hai, to wo production server pe bhi almost guarantee hai ki chalega. Environment consistent rehta hai.
+
+2.  **Easy Setup (Jhanjhat Mukt Shuruat)**:
+    *   Bina Docker ke, naye developer ko pehle PostgreSQL install karna padega, phir Redis, phir Node.js configure karna padega.
+    *   Docker ke saath, humne `docker-compose.yml` file bana di hai. Aapko bas `docker-compose up` command chalana hai, aur Docker khud-ba-khud Database, Redis, aur Backend ko download karke setup kar dega.
+
+3.  **Isolation (Sabki Apni Duniya)**:
+    *   Humare project me **PostgreSQL** (Database) aur **Redis** (Queue) alag-alag containers me chalte hain.
+    *   Iska matlab ye hai ki ye aapke laptop ke main OS ko ganda nahi karte. Jab kaam khatam, container delete kar do, sab saaf.
+
+### Summary
+Docker development ko fast, clean, aur reliable banata hai. Naye bande ko project setup karne me ghanto nahi, bas kuch minutes lagte hain.
